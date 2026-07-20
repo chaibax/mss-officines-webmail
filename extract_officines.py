@@ -21,7 +21,8 @@ Usage :
   python3 extract_officines.py --limit 200   # test rapide sur un échantillon
 
 Sorties (dans --out, défaut ./out) :
-  officines_email_grand_public.csv ; synthese.md
+  officines_email_grand_public.csv ; officines_email_professionnel.csv (domaine
+  propre, « non public ») ; synthese.md ; agregats.json (dénombrements pour le dashboard)
 """
 import argparse
 import csv
@@ -53,6 +54,15 @@ def departement(code_postal):
     if cp[:2] in ("97", "98"):
         return cp[:3] if len(cp) >= 3 else cp[:2]
     return cp[:2]
+
+
+def _row(finess, name, line, cp, ville, rpps, nom, prenom, email, domain, cat, a_bal, source):
+    return {
+        "finess": finess, "raison_sociale": name, "adresse": line,
+        "code_postal": cp, "ville": ville, "rpps": rpps, "nom": nom, "prenom": prenom,
+        "email": email, "domaine": domain, "categorie_domaine": cat,
+        "a_bal_mss": a_bal, "source": source,
+    }
 
 
 # ------------------------------------------------------------- parsing FHIR
@@ -225,15 +235,19 @@ def run(args):
                   "Télécharger le fichier data.gouv.fr ou passer --bal CHEMIN.",
                   file=sys.stderr)
 
-    rows = []
-    seen = set()                     # dédoublonnage (finess, email)
+    rows = []                        # lignes grand public (webmail)
+    rows_pro = []                    # lignes domaine propre / professionnel (« non public »)
+    seen = set()                     # dédoublonnage grand public (finess, email)
+    seen_pro = set()                 # dédoublonnage professionnel (finess, email)
     n_officines = 0
     n_officines_email_public = 0     # officines déclarant ≥1 e-mail de structure
     emails_par_cat = {config.CAT_GRAND_PUBLIC: set(),
                       config.CAT_PRO: set(),
                       config.CAT_MSSANTE: set()}
     top_domaines = Counter()
-    cibles_finess = set()            # officines grand_public sans BAL MSS
+    top_domaines_pro = Counter()
+    cibles_finess = set()            # officines grand_public SANS BAL MSS -> à équiper
+    accompagner_finess = set()       # officines grand_public AVEC BAL MSS -> à accompagner
     par_dept = defaultdict(lambda: {"officines": 0, "avec_email": 0, "grand_public": 0})
     cibles_by_dept = defaultdict(set)
     a_bal_counts = Counter()         # répartition oui/non/inconnu (lignes grand public)
@@ -253,6 +267,35 @@ def run(args):
             return "oui"
         return "non" if bal.available else "inconnu"
 
+    # Traite un e-mail selon sa catégorie ; deux gisements retenus :
+    #  - grand public (webmail)  -> cible à équiper (sans BAL) ou à accompagner (avec BAL) ;
+    #  - professionnel (domaine propre, « non public ») -> contactable hors espace de confiance.
+    # Les e-mails MSSanté ne sont pas exportés (déjà dans l'espace de confiance).
+    def handle_email(email, domain, cat, status, rpps, nom, prenom, source):
+        if cat == config.CAT_GRAND_PUBLIC:
+            key = (finess, email)
+            if key in seen:
+                return
+            seen.add(key)
+            top_domaines[domain] += 1
+            par_dept[dept]["grand_public"] += 1
+            a_bal_counts[status] += 1
+            rows.append(_row(finess, name, line, cp, ville, rpps, nom, prenom,
+                             email, domain, cat, status, source))
+            if status == "non":
+                cibles_finess.add(finess)
+                cibles_by_dept[dept].add(finess)
+            elif status == "oui":
+                accompagner_finess.add(finess)
+        elif cat == config.CAT_PRO:
+            key = (finess, email)
+            if key in seen_pro:
+                return
+            seen_pro.add(key)
+            top_domaines_pro[domain] += 1
+            rows_pro.append(_row(finess, name, line, cp, ville, rpps, nom, prenom,
+                                 email, domain, cat, status, source))
+
     for org in enumerate_officines(client, limit=args.limit):
         n_officines += 1
         finess = pick_finess(org)
@@ -270,24 +313,7 @@ def run(args):
         # Voie A — e-mails déclarés au niveau structure.
         for email, domain, cat in org_emails:
             emails_par_cat[cat].add(email)
-            if cat != config.CAT_GRAND_PUBLIC:
-                continue
-            key = (finess, email)
-            if key in seen:
-                continue
-            seen.add(key)
-            top_domaines[domain] += 1
-            par_dept[dept]["grand_public"] += 1
-            a_bal_counts[off_status] += 1
-            rows.append({
-                "finess": finess, "raison_sociale": name, "adresse": line,
-                "code_postal": cp, "ville": ville, "rpps": "", "nom": "", "prenom": "",
-                "email": email, "domaine": domain, "categorie_domaine": cat,
-                "a_bal_mss": off_status, "source": SRC_PUBLIC,
-            })
-            if off_status == "non":
-                cibles_finess.add(finess)
-                cibles_by_dept[dept].add(finess)
+            handle_email(email, domain, cat, off_status, "", "", "", SRC_PUBLIC)
 
         # Voie B — e-mail de correspondance des pharmaciens (donnée restreinte).
         if args.restreint and finess:
@@ -305,25 +331,8 @@ def run(args):
                 p_status = pharm_status(rpps, off_status, pharm_mss)
                 for email, domain, cat in pharm_emails:
                     emails_par_cat[cat].add(email)
-                    if cat != config.CAT_GRAND_PUBLIC:
-                        continue
-                    key = (finess, email)
-                    if key in seen:
-                        continue
-                    seen.add(key)
-                    top_domaines[domain] += 1
-                    par_dept[dept]["grand_public"] += 1
-                    a_bal_counts[p_status] += 1
-                    rows.append({
-                        "finess": finess, "raison_sociale": name, "adresse": line,
-                        "code_postal": cp, "ville": ville, "rpps": rpps,
-                        "nom": nom, "prenom": prenom, "email": email,
-                        "domaine": domain, "categorie_domaine": cat,
-                        "a_bal_mss": p_status, "source": SRC_RESTREINT,
-                    })
-                    if p_status == "non":
-                        cibles_finess.add(finess)
-                        cibles_by_dept[dept].add(finess)
+                    handle_email(email, domain, cat, p_status, rpps, nom, prenom,
+                                 SRC_RESTREINT)
 
         if n_officines % 1000 == 0:
             print(f"  [progress] {n_officines} officines, {len(rows)} lignes "
@@ -335,12 +344,14 @@ def run(args):
          for d, v in par_dept.items()),
         key=lambda r: -r["cibles"])
 
-    write_outputs(args.out, rows, {
+    write_outputs(args.out, rows, rows_pro, {
         "n_officines": n_officines,
         "n_officines_email_public": n_officines_email_public,
         "emails_par_cat": {k: len(v) for k, v in emails_par_cat.items()},
         "top_domaines": top_domaines,
+        "top_domaines_pro": top_domaines_pro,
         "n_cibles": len(cibles_finess),
+        "n_accompagner": len(accompagner_finess),
         "a_bal": dict(a_bal_counts),
         "par_departement": par_departement,
         "bal_available": bal.available,
@@ -349,18 +360,26 @@ def run(args):
 
 
 # -------------------------------------------------------------------- sorties
-def write_outputs(out_dir, rows, stats):
-    os.makedirs(out_dir, exist_ok=True)
-    csv_path = os.path.join(out_dir, "officines_email_grand_public.csv")
-    with open(csv_path, "w", encoding="utf-8", newline="") as f:
+def _write_csv(path, rows):
+    with open(path, "w", encoding="utf-8", newline="") as f:
         w = csv.DictWriter(f, fieldnames=CSV_COLUMNS, delimiter=";")
         w.writeheader()
         for r in sorted(rows, key=lambda r: (r["code_postal"], r["finess"], r["email"])):
             w.writerow(r)
 
+
+def write_outputs(out_dir, rows, rows_pro, stats):
+    os.makedirs(out_dir, exist_ok=True)
+    csv_path = os.path.join(out_dir, "officines_email_grand_public.csv")
+    _write_csv(csv_path, rows)
+    # 2e export : e-mails à domaine propre (« non public ») — contactables hors
+    # espace de confiance MSSanté.
+    csv_pro_path = os.path.join(out_dir, "officines_email_professionnel.csv")
+    _write_csv(csv_pro_path, rows_pro)
+
     md_path = os.path.join(out_dir, "synthese.md")
     with open(md_path, "w", encoding="utf-8") as f:
-        f.write(build_synthese(rows, stats))
+        f.write(build_synthese(rows, rows_pro, stats))
 
     # Agrégats SANS donnée personnelle (uniquement des dénombrements) — sûrs à
     # publier et consommés par le dashboard.
@@ -377,19 +396,26 @@ def write_outputs(out_dir, rows, stats):
             "emails_professionnel": stats["emails_par_cat"][config.CAT_PRO],
             "emails_mssante": stats["emails_par_cat"][config.CAT_MSSANTE],
             "lignes_grand_public": len(rows),
+            "lignes_professionnel": len(rows_pro),
             "cibles_prioritaires": stats["n_cibles"],
+        },
+        "cibles": {
+            "a_equiper": stats["n_cibles"],          # grand public SANS BAL MSS
+            "a_accompagner": stats["n_accompagner"],  # grand public AVEC BAL MSS
         },
         "a_bal": stats["a_bal"],
         "top_domaines": stats["top_domaines"].most_common(20),
+        "top_domaines_pro": stats["top_domaines_pro"].most_common(20),
         "par_departement": stats["par_departement"],
     }
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(agg, f, ensure_ascii=False, indent=2)
 
-    print(f"\nÉcrit : {csv_path} ({len(rows)} lignes) ; {md_path} ; {json_path}")
+    print(f"\nÉcrit : {csv_path} ({len(rows)} lignes) ; "
+          f"{csv_pro_path} ({len(rows_pro)} lignes) ; {md_path} ; {json_path}")
 
 
-def build_synthese(rows, stats):
+def build_synthese(rows, rows_pro, stats):
     tag = date.today().strftime("%Y-%m-%d")
     n = stats["n_officines"]
     n_email = stats["n_officines_email_public"]
@@ -413,10 +439,17 @@ def build_synthese(rows, stats):
         f"| Officines avec ≥1 e-mail déclaré | {n_email:,} ({pct_email}) |",
         f"| Officines sans e-mail public | {sans_email:,} |",
         f"| E-mails distincts — grand public | {cat[config.CAT_GRAND_PUBLIC]:,} |",
-        f"| E-mails distincts — professionnel | {cat[config.CAT_PRO]:,} |",
+        f"| E-mails distincts — professionnel (domaine propre) | {cat[config.CAT_PRO]:,} |",
         f"| E-mails distincts — MSSanté | {cat[config.CAT_MSSANTE]:,} |",
-        f"| **Lignes grand public retenues (CSV)** | **{len(rows):,}** |",
-        f"| **Cibles prioritaires (grand public SANS BAL MSSanté)** | **{stats['n_cibles']:,}** |",
+        "",
+        "## Deux cibles grand public",
+        "",
+        "| Cible | Définition | Officines | Action |",
+        "|---|---|---:|---|",
+        f"| **À équiper** | grand public **sans** BAL MSSanté | **{stats['n_cibles']:,}** | conversion prioritaire |",
+        f"| **À accompagner** | grand public **avec** BAL MSSanté | **{stats['n_accompagner']:,}** | déjà équipées, joignables sur leur boîte grand public → pousser l'usage |",
+        f"| Lignes grand public (CSV) | e-mails retenus | {len(rows):,} | `officines_email_grand_public.csv` |",
+        f"| Lignes professionnel (CSV) | domaine propre, « non public » | {len(rows_pro):,} | `officines_email_professionnel.csv` — contactables hors espace de confiance |",
         "",
         "## Top domaines grand public",
         "",
@@ -424,6 +457,16 @@ def build_synthese(rows, stats):
         "|---|---:|",
     ]
     for domain, count in stats["top_domaines"].most_common(15):
+        lines.append(f"| {domain} | {count:,} |")
+
+    lines += [
+        "",
+        "## Top domaines professionnels (domaine propre, « non public »)",
+        "",
+        "| Domaine | Occurrences |",
+        "|---|---:|",
+    ]
+    for domain, count in stats["top_domaines_pro"].most_common(15):
         lines.append(f"| {domain} | {count:,} |")
 
     lines += [

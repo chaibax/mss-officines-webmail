@@ -8,6 +8,7 @@ Style DSFR, cohérent avec dashboard-penetration-mssante.html.
 Usage : python3 build_dashboard.py [out/agregats.json] [dashboard/index.html]
 """
 import json
+import os
 import sys
 
 DEPT_NOMS = {
@@ -37,7 +38,7 @@ DEPT_NOMS = {
     "974": "La Réunion", "975": "St-Pierre-et-M.", "976": "Mayotte",
 }
 
-BLEU, ROUGE, VERT, AMBRE = "#000091", "#e1000f", "#18753c", "#b34000"
+BLEU, BLEUCLAIR, ROUGE, VERT, AMBRE = "#000091", "#5b8def", "#e1000f", "#18753c", "#b34000"
 
 
 def nf(x):
@@ -85,46 +86,53 @@ def build(agg):
     pct_email = 100 * p["avec_email"] / p["officines"] if p["officines"] else 0
     pct_cible = 100 * p["cibles_prioritaires"] / p["officines"] if p["officines"] else 0
 
+    cib = agg.get("cibles", {})
+    a_equiper = cib.get("a_equiper", p["cibles_prioritaires"])
+    a_accompagner = cib.get("a_accompagner", 0)
+
     steps = [
         ("Officines (pharmacies d'officine)", p["officines"],
          "répertoire FINESS type 620", BLEU),
         ("Avec e-mail déclaré", p["avec_email"],
-         f"{pct_email:.0f} % du parc — donnée publique", "#5b8def"),
-        ("E-mail « grand public »", p["emails_grand_public"],
-         "webmail / FAI (gmail, orange…)", AMBRE),
-        ("Sans messagerie MSSanté → CIBLE", p["cibles_prioritaires"],
+         f"{pct_email:.0f} % du parc — donnée publique", BLEUCLAIR),
+        ("E-mail grand public", p["emails_grand_public"],
+         "webmail / FAI (gmail, orange...)", AMBRE),
+        ("Sans messagerie MSSanté → à équiper", a_equiper,
          "grand public ET aucune BAL MSSanté", ROUGE),
     ]
 
-    doms = [(d, c) for d, c in agg["top_domaines"][:12]]
-    dom_svg = hbar_svg(doms, color=BLEU)
+    dom_svg = hbar_svg(agg["top_domaines"][:12], color=BLEU)
+    dompro_svg = hbar_svg(agg.get("top_domaines_pro", [])[:12], color=BLEUCLAIR)
 
     depts = agg["par_departement"][:20]
     dpairs = [(f'{DEPT_NOMS.get(r["dept"], r["dept"])} ({r["dept"]})', r["cibles"]) for r in depts]
     dept_svg = hbar_svg(dpairs, color=ROUGE, width=780, bar_h=22, gap=8, label_w=210)
 
-    a = agg["a_bal"]
-    oui, non = a.get("oui", 0), a.get("non", 0)
+    # Répartition en OFFICINES distinctes (cohérent avec KPI et bannière).
+    non, oui = a_equiper, a_accompagner
     tot = oui + non or 1
     pna, poa = 100 * non / tot, 100 * oui / tot
+    gpoff = nf(a_equiper + a_accompagner)
 
     kpi = f"""<div class="kpis">
     <div class="kpi"><div class="lab">Officines (type 620)</div>
       <div class="big">{nf(p['officines'])}</div><div class="small">parc énuméré via l'API</div></div>
-    <div class="kpi"><div class="lab">Avec e-mail déclaré</div>
-      <div class="big">{pct_email:.0f} %</div><div class="small">{nf(p['avec_email'])} officines</div></div>
-    <div class="kpi ratio"><div class="lab">E-mails grand public</div>
-      <div class="big">{nf(p['emails_grand_public'])}</div><div class="small">{nf(p['emails_mssante'])} en MSSanté · {nf(p['emails_professionnel'])} pro</div></div>
-    <div class="kpi hero"><div class="lab">Cibles prioritaires</div>
-      <div class="big">{nf(p['cibles_prioritaires'])}</div><div class="small">grand public SANS BAL MSSanté</div></div>
+    <div class="kpi"><div class="lab">E-mails grand public</div>
+      <div class="big">{nf(p['emails_grand_public'])}</div><div class="small">{pct_email:.0f} % des officines ont un e-mail</div></div>
+    <div class="kpi hero"><div class="lab">Cible 1 &mdash; à équiper</div>
+      <div class="big">{nf(a_equiper)}</div><div class="small">grand public SANS MSSanté</div></div>
+    <div class="kpi accomp"><div class="lab">Cible 2 &mdash; à accompagner</div>
+      <div class="big">{nf(a_accompagner)}</div><div class="small">grand public AVEC MSSanté</div></div>
   </div>"""
 
     return TEMPLATE.format(
         date=esc(date), officines=nf(p["officines"]),
-        cibles=nf(p["cibles_prioritaires"]), gp=nf(p["emails_grand_public"]),
+        cibles=nf(a_equiper), accomp=nf(a_accompagner), gp=nf(p["emails_grand_public"]),
+        pro=nf(p["emails_professionnel"]), lignes_pro=nf(p.get("lignes_professionnel", 0)),
         sans_email=nf(p["sans_email"]), pct_cible=f"{pct_cible:.0f}",
-        kpi=kpi, funnel=funnel_html(steps), dom_svg=dom_svg, dept_svg=dept_svg,
-        oui=nf(oui), non=nf(non), pna=f"{pna:.0f}", poa=f"{poa:.0f}",
+        kpi=kpi, funnel=funnel_html(steps), dom_svg=dom_svg, dompro_svg=dompro_svg,
+        dept_svg=dept_svg, oui=nf(oui), non=nf(non), gpoff=gpoff,
+        pna=f"{pna:.0f}", poa=f"{poa:.0f}",
         n_depts=len(agg["par_departement"]),
     )
 
@@ -137,7 +145,7 @@ TEMPLATE = """<!DOCTYPE html>
 <title>Officines à e-mail grand public — cibles d'adoption MSSanté</title>
 <style>
   :root{{
-    --bleu:#000091;--bleu-pale2:#f2f2ff;--rouge:#e1000f;--vert:#18753c;--ambre:#b34000;
+    --bleu:#000091;--bleu-clair:#5b8def;--bleu-pale2:#f2f2ff;--rouge:#e1000f;--vert:#18753c;--ambre:#b34000;
     --encre:#161616;--gris:#666;--gris-clair:#e5e5e5;--fond:#f6f6fb;--carte:#fff;
     --ombre:0 1px 3px rgba(0,0,18,.08),0 6px 24px rgba(0,0,18,.05);--radius:12px;
   }}
@@ -152,13 +160,13 @@ TEMPLATE = """<!DOCTYPE html>
   .sub{{color:var(--gris);max-width:860px;margin:0;font-size:15.5px}}
   .ref-badge{{display:inline-block;margin-top:10px;font-size:12.5px;color:var(--gris);border:1px solid var(--gris-clair);border-radius:8px;padding:4px 10px;background:#fff}}
   .banner{{background:linear-gradient(135deg,#11114a,#000091);color:#fff;border-radius:var(--radius);padding:20px 24px;margin:22px 0 20px;box-shadow:var(--ombre);font-size:16.5px;line-height:1.55}}
-  .banner .em{{color:#ff9a9a;font-weight:800}}.banner b{{color:#fff}}.banner .huge{{font-size:21px;font-weight:800;display:block;margin-bottom:6px}}
+  .banner .em{{color:#ff9a9a;font-weight:800}}.banner .em2{{color:#a9c4ff;font-weight:800}}.banner b{{color:#fff}}.banner .huge{{font-size:21px;font-weight:800;display:block;margin-bottom:6px}}
   .kpis{{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}}
   .kpi{{background:var(--carte);border:1px solid var(--gris-clair);border-radius:var(--radius);padding:15px 17px;box-shadow:var(--ombre)}}
   .kpi .lab{{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;color:var(--gris);margin-bottom:7px;min-height:30px}}
   .kpi .big{{font-size:29px;font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums;letter-spacing:-.01em}}
   .kpi .small{{font-size:12.5px;color:var(--gris);margin-top:6px;font-variant-numeric:tabular-nums}}
-  .kpi.hero .big{{color:var(--rouge)}} .kpi.ratio .big{{color:var(--ambre)}}
+  .kpi.hero .big{{color:var(--rouge)}} .kpi.accomp .big{{color:var(--bleu)}}
   .panel{{background:var(--carte);border:1px solid var(--gris-clair);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--ombre);margin-bottom:20px}}
   .panel h2{{font-size:18px;margin:0 0 4px}}.panel .ptag{{font-size:13px;color:var(--gris);margin:0 0 16px}}
   .grid2{{display:grid;grid-template-columns:1fr 1fr;gap:20px}}
@@ -172,11 +180,12 @@ TEMPLATE = """<!DOCTYPE html>
   svg{{width:100%;height:auto;display:block}}
   .hb-lab{{fill:#333;font-size:13px;text-anchor:end;font-family:inherit}}
   .hb-val{{fill:#111;font-size:13px;font-weight:700;text-anchor:start;font-variant-numeric:tabular-nums;font-family:inherit}}
-  .split{{display:flex;height:54px;border-radius:8px;overflow:hidden;border:1px solid var(--gris-clair)}}
+  .split{{display:flex;height:58px;border-radius:8px;overflow:hidden;border:1px solid var(--gris-clair)}}
   .split div{{display:flex;flex-direction:column;justify-content:center;padding:0 15px;color:#fff;font-size:12.5px;line-height:1.3;white-space:nowrap;overflow:hidden}}
-  .split .a{{background:var(--rouge)}} .split .b{{background:var(--vert)}}
+  .split .a{{background:var(--rouge)}} .split .b{{background:var(--bleu)}}
   .split b{{font-size:14px;font-variant-numeric:tabular-nums}}
   .splitlab{{display:flex;justify-content:space-between;font-size:11.5px;color:var(--gris);margin-top:7px}}
+  .note{{font-size:13px;color:#333;background:var(--bleu-pale2);border-radius:8px;padding:11px 14px;margin-top:14px;line-height:1.5}}
   details.method{{margin-top:6px;background:var(--carte);border:1px solid var(--gris-clair);border-radius:var(--radius);padding:16px 20px;box-shadow:var(--ombre)}}
   details.method summary{{cursor:pointer;font-weight:700;color:var(--bleu);font-size:15px}}
   details.method .body{{font-size:13.5px;color:#333;margin-top:12px}}
@@ -189,19 +198,19 @@ TEMPLATE = """<!DOCTYPE html>
 <body>
 <header class="top">
   <span class="eyebrow">● MSSanté — DNS · cibles d'adoption</span>
-  <h1>Officines joignables en webmail « grand public » : {cibles} cibles prioritaires d'adoption MSSanté</h1>
-  <p class="sub">Une adresse de contact en webmail grand public (gmail, orange…) est un marqueur de faible maturité numérique. Croisée avec l'absence de messagerie MSSanté, elle isole les officines à convertir en priorité. Données de l'<b>Annuaire Santé</b> (ANS), tier public, sans scraping.</p>
+  <h1>Officines joignables en webmail « grand public » : {cibles} à équiper, {accomp} à accompagner</h1>
+  <p class="sub">Une adresse de contact en webmail grand public (gmail, orange…) est un marqueur de maturité numérique. Croisée avec la messagerie MSSanté, elle dessine deux cibles complémentaires. Données de l'<b>Annuaire Santé</b> (ANS), tier public, sans scraping.</p>
   <div class="ref-badge">Source : API FHIR Annuaire Santé (ANS), données publiques · extraction du {date} · {officines} officines énumérées</div>
 </header>
 <div class="wrap">
   <div class="banner">
-    <span class="huge">{cibles} officines à convertir en priorité.</span>
-    Sur {officines} pharmacies d'officine, <b>{gp} affichent un e-mail de contact grand public</b>. Parmi elles, <span class="em">{cibles} n'ont aucune messagerie MSSanté</span> — soit {pct_cible}&nbsp;% du parc, joignables directement pour une campagne d'adoption. En complément, {sans_email} officines ne déclarent aucun e-mail public : à traiter en donnée restreinte (voie B) ou via BICOEUR.
+    <span class="huge">Deux cibles, une même porte d'entrée : la boîte grand public.</span>
+    Sur {officines} pharmacies d'officine, <b>{gp} affichent un e-mail de contact grand public</b>. Parmi elles, <span class="em">{cibles} n'ont aucune messagerie MSSanté</span> (à équiper) et <span class="em2">{accomp} en ont déjà une</span> (déjà équipées, à accompagner vers l'usage) — toutes joignables directement sur leur boîte grand public. En complément, {sans_email} officines ne déclarent aucun e-mail public : à traiter en donnée restreinte ou via BICOEUR.
   </div>
   {kpi}
   <div class="panel">
-    <h2>L'entonnoir — du parc aux cibles prioritaires</h2>
-    <p class="ptag">À chaque étape on resserre : parc total → officines avec e-mail → e-mail grand public → sans messagerie MSSanté. La dernière barre est la cible actionnable.</p>
+    <h2>L'entonnoir — du parc à la cible « à équiper »</h2>
+    <p class="ptag">Parc total → officines avec e-mail → e-mail grand public → sans messagerie MSSanté. La dernière barre est la cible prioritaire de conversion.</p>
     {funnel}
   </div>
   <div class="grid2">
@@ -211,29 +220,35 @@ TEMPLATE = """<!DOCTYPE html>
       {dom_svg}
     </div>
     <div class="panel">
-      <h2>Ces officines ont-elles déjà une BAL MSSanté&nbsp;?</h2>
-      <p class="ptag">Parmi les {gp} e-mails grand public, part déjà équipée en MSSanté vs. cibles réelles.</p>
+      <h2>Deux cibles complémentaires</h2>
+      <p class="ptag">Répartition des {gpoff} officines à e-mail grand public : sans MSSanté (à équiper) vs. déjà équipée (à accompagner).</p>
       <div class="split">
-        <div class="a" style="flex:{pna}"><b>Sans MSSanté · {pna}&nbsp;%</b>{non} — cibles</div>
-        <div class="b" style="flex:{poa}"><b>Déjà MSSanté · {poa}&nbsp;%</b>{oui}</div>
+        <div class="a" style="flex:{pna}"><b>À équiper · {pna}&nbsp;%</b>{non} — sans MSSanté</div>
+        <div class="b" style="flex:{poa}"><b>À accompagner · {poa}&nbsp;%</b>{oui} — déjà MSSanté</div>
       </div>
-      <div class="splitlab"><span>↑ à convertir en priorité</span><span>équipées ↑</span></div>
-      <p class="ptag" style="margin-top:16px">L'équipement MSSanté est établi hors API, par croisement avec l'extraction quotidienne des BAL MSSanté (data.gouv.fr) et la présence d'une adresse <code>@*.mssante.fr</code> dans les coordonnées de l'officine.</p>
+      <div class="splitlab"><span>↑ conversion prioritaire</span><span>déjà équipées, à activer ↑</span></div>
+      <div class="note"><b>Les « déjà équipées » restent une cible.</b> Elles ont une BAL MSSanté mais continuent d'afficher une boîte grand public : signe qu'elles n'ont pas basculé leurs usages. On peut les contacter sur cette boîte grand public pour les accompagner vers un usage réel de MSSanté.</div>
     </div>
   </div>
   <div class="panel">
-    <h2>Cibles prioritaires par département (top 20)</h2>
-    <p class="ptag">Nombre d'officines à e-mail grand public sans messagerie MSSanté, par département — sur {n_depts} départements couverts. De quoi prioriser géographiquement une campagne.</p>
+    <h2>Domaines professionnels (domaine propre — « non public »)</h2>
+    <p class="ptag">Officines à e-mail sur domaine propre (ni webmail, ni MSSanté) : {pro} e-mails distincts. Contactables hors espace de confiance. Le top révèle surtout des plateformes de logiciels/groupements officinaux.</p>
+    {dompro_svg}
+    <div class="note">Export dédié disponible : <code>officines_email_professionnel.csv</code> ({lignes_pro} lignes) — hors ligne (donnée personnelle), pour un contact direct sans passer par l'espace de confiance MSSanté.</div>
+  </div>
+  <div class="panel">
+    <h2>Cibles « à équiper » par département (top 20)</h2>
+    <p class="ptag">Officines à e-mail grand public sans messagerie MSSanté, par département — sur {n_depts} départements couverts. De quoi prioriser géographiquement une campagne.</p>
     {dept_svg}
   </div>
   <details class="method" open>
     <summary>Méthode, périmètre &amp; RGPD</summary>
     <div class="body">
       <p><b>Périmètre.</b> Toutes les <code>Organization</code> de type 620 (pharmacie d'officine) de l'Annuaire Santé, énumérées via l'API FHIR de l'ANS (données publiques). L'e-mail capté est celui déclaré au niveau <i>structure</i> de l'officine.</p>
-      <p><b>Classification.</b> Le domaine après « @ » est classé <code>grand public</code> (webmail/FAI : gmail, orange, wanadoo, hotmail, yahoo, free…), <code>professionnel</code> (domaine propre) ou <code>MSSanté</code> (<code>@*.mssante.fr</code>, exclu des cibles).</p>
-      <p><b>Cible prioritaire</b> = e-mail grand public <b>ET</b> aucune BAL MSSanté active (ni au niveau officine, ni via l'adresse <code>@mssante.fr</code> déclarée).</p>
-      <p><b>Limite.</b> Le tier public ne couvre pas l'e-mail de correspondance des pharmacien·nes (donnée restreinte) : les {sans_email} officines sans e-mail public relèvent d'une extraction restreinte (voie B) ou du lac BICOEUR.</p>
-      <p><b>RGPD.</b> Cette page ne contient que des <b>dénombrements agrégés</b> — aucune adresse, aucun nom, aucun FINESS individuel. Le fichier nominatif de campagne reste hors ligne. Traitement fondé sur une mission d'intérêt public (art. 6.1.e + 6.3), finalité unique = adoption de MSSanté.</p>
+      <p><b>Classification.</b> Le domaine après « @ » est classé <code>grand public</code> (webmail/FAI), <code>professionnel</code> (domaine propre, « non public ») ou <code>MSSanté</code> (<code>@*.mssante.fr</code>, non exporté car déjà dans l'espace de confiance).</p>
+      <p><b>Deux cibles grand public.</b> <b>À équiper</b> = e-mail grand public ET aucune BAL MSSanté. <b>À accompagner</b> = e-mail grand public ET BAL MSSanté existante (équipée mais joignable hors trust space). L'équipement MSSanté est établi hors API, par croisement avec l'extraction quotidienne des BAL MSSanté (data.gouv.fr) et la présence d'une adresse <code>@*.mssante.fr</code>.</p>
+      <p><b>Limite.</b> Le tier public ne couvre pas l'e-mail de correspondance des pharmacien·nes (donnée restreinte) : les {sans_email} officines sans e-mail public relèvent d'une extraction restreinte ou du lac BICOEUR.</p>
+      <p><b>RGPD.</b> Cette page ne contient que des <b>dénombrements agrégés</b> — aucune adresse, aucun nom, aucun FINESS individuel. Les fichiers nominatifs de campagne restent hors ligne. Traitement fondé sur une mission d'intérêt public (art. 6.1.e + 6.3), finalité unique = adoption de MSSanté.</p>
     </div>
   </details>
 </div>
@@ -252,7 +267,6 @@ def main():
     dst = sys.argv[2] if len(sys.argv) > 2 else "dashboard/index.html"
     with open(src, encoding="utf-8") as f:
         agg = json.load(f)
-    import os
     os.makedirs(os.path.dirname(dst) or ".", exist_ok=True)
     with open(dst, "w", encoding="utf-8") as f:
         f.write(build(agg))
