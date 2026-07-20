@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Officines à e-mail grand public — cibles d'adoption MSSanté</title>
+<style>
+  :root{
+    --bleu:#000091;--bleu-pale2:#f2f2ff;--rouge:#e1000f;--vert:#18753c;--ambre:#b34000;
+    --encre:#161616;--gris:#666;--gris-clair:#e5e5e5;--fond:#f6f6fb;--carte:#fff;
+    --ombre:0 1px 3px rgba(0,0,18,.08),0 6px 24px rgba(0,0,18,.05);--radius:12px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--fond);color:var(--encre);font-size:16px;line-height:1.45;
+    font-family:"Marianne","Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 20px 70px}
+  header.top{max-width:1120px;margin:0 auto;padding:28px 20px 6px}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;
+    letter-spacing:.04em;text-transform:uppercase;color:var(--rouge);background:#ffe9e9;padding:5px 12px;border-radius:99px}
+  h1{font-size:28px;line-height:1.14;margin:13px 0 6px;font-weight:800;letter-spacing:-.01em}
+  .sub{color:var(--gris);max-width:860px;margin:0;font-size:15.5px}
+  .ref-badge{display:inline-block;margin-top:10px;font-size:12.5px;color:var(--gris);border:1px solid var(--gris-clair);border-radius:8px;padding:4px 10px;background:#fff}
+  .banner{background:linear-gradient(135deg,#11114a,#000091);color:#fff;border-radius:var(--radius);padding:20px 24px;margin:22px 0 20px;box-shadow:var(--ombre);font-size:16.5px;line-height:1.55}
+  .banner .em{color:#ff9a9a;font-weight:800}.banner b{color:#fff}.banner .huge{font-size:21px;font-weight:800;display:block;margin-bottom:6px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+  .kpi{background:var(--carte);border:1px solid var(--gris-clair);border-radius:var(--radius);padding:15px 17px;box-shadow:var(--ombre)}
+  .kpi .lab{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;color:var(--gris);margin-bottom:7px;min-height:30px}
+  .kpi .big{font-size:29px;font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+  .kpi .small{font-size:12.5px;color:var(--gris);margin-top:6px;font-variant-numeric:tabular-nums}
+  .kpi.hero .big{color:var(--rouge)} .kpi.ratio .big{color:var(--ambre)}
+  .panel{background:var(--carte);border:1px solid var(--gris-clair);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--ombre);margin-bottom:20px}
+  .panel h2{font-size:18px;margin:0 0 4px}.panel .ptag{font-size:13px;color:var(--gris);margin:0 0 16px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .step{display:flex;align-items:center;gap:14px;padding:10px 12px;border-radius:10px;margin-bottom:8px}
+  .step .name{flex:0 0 250px;font-size:14px}
+  .step .name b{display:block} .step .name span{font-size:12px;color:var(--gris);font-variant-numeric:tabular-nums}
+  .step .barwrap{flex:1;background:#f0f0f5;border-radius:6px;height:30px;overflow:hidden}
+  .step .bar{height:100%;border-radius:6px}
+  .step .pctbig{flex:0 0 150px;text-align:right;font-variant-numeric:tabular-nums}
+  .step .pctbig b{font-size:20px;font-weight:800} .step .pctbig span{font-size:12px;color:var(--gris);display:block}
+  svg{width:100%;height:auto;display:block}
+  .hb-lab{fill:#333;font-size:13px;text-anchor:end;font-family:inherit}
+  .hb-val{fill:#111;font-size:13px;font-weight:700;text-anchor:start;font-variant-numeric:tabular-nums;font-family:inherit}
+  .split{display:flex;height:54px;border-radius:8px;overflow:hidden;border:1px solid var(--gris-clair)}
+  .split div{display:flex;flex-direction:column;justify-content:center;padding:0 15px;color:#fff;font-size:12.5px;line-height:1.3;white-space:nowrap;overflow:hidden}
+  .split .a{background:var(--rouge)} .split .b{background:var(--vert)}
+  .split b{font-size:14px;font-variant-numeric:tabular-nums}
+  .splitlab{display:flex;justify-content:space-between;font-size:11.5px;color:var(--gris);margin-top:7px}
+  details.method{margin-top:6px;background:var(--carte);border:1px solid var(--gris-clair);border-radius:var(--radius);padding:16px 20px;box-shadow:var(--ombre)}
+  details.method summary{cursor:pointer;font-weight:700;color:var(--bleu);font-size:15px}
+  details.method .body{font-size:13.5px;color:#333;margin-top:12px}
+  details.method code{background:var(--bleu-pale2);padding:1px 6px;border-radius:5px}
+  footer{max-width:1120px;margin:22px auto 0;padding:0 20px;font-size:12.5px;color:var(--gris)}
+  footer a{color:var(--bleu)}
+  @media(max-width:880px){.kpis{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}.step .name{flex-basis:150px}.step .pctbig{flex-basis:110px}h1{font-size:22px}}
+</style>
+</head>
+<body>
+<header class="top">
+  <span class="eyebrow">● MSSanté — DNS · cibles d'adoption</span>
+  <h1>Officines joignables en webmail « grand public » : 2 719 cibles prioritaires d'adoption MSSanté</h1>
+  <p class="sub">Une adresse de contact en webmail grand public (gmail, orange…) est un marqueur de faible maturité numérique. Croisée avec l'absence de messagerie MSSanté, elle isole les officines à convertir en priorité. Données de l'<b>Annuaire Santé</b> (ANS), tier public, sans scraping.</p>
+  <div class="ref-badge">Source : API FHIR Annuaire Santé (ANS), données publiques · extraction du 2026-07-20 · 20 439 officines énumérées</div>
+</header>
+<div class="wrap">
+  <div class="banner">
+    <span class="huge">2 719 officines à convertir en priorité.</span>
+    Sur 20 439 pharmacies d'officine, <b>7 382 affichent un e-mail de contact grand public</b>. Parmi elles, <span class="em">2 719 n'ont aucune messagerie MSSanté</span> — soit 13&nbsp;% du parc, joignables directement pour une campagne d'adoption. En complément, 5 843 officines ne déclarent aucun e-mail public : à traiter en donnée restreinte (voie B) ou via BICOEUR.
+  </div>
+  <div class="kpis">
+    <div class="kpi"><div class="lab">Officines (type 620)</div>
+      <div class="big">20 439</div><div class="small">parc énuméré via l'API</div></div>
+    <div class="kpi"><div class="lab">Avec e-mail déclaré</div>
+      <div class="big">71 %</div><div class="small">14 596 officines</div></div>
+    <div class="kpi ratio"><div class="lab">E-mails grand public</div>
+      <div class="big">7 382</div><div class="small">11 632 en MSSanté · 1 552 pro</div></div>
+    <div class="kpi hero"><div class="lab">Cibles prioritaires</div>
+      <div class="big">2 719</div><div class="small">grand public SANS BAL MSSanté</div></div>
+  </div>
+  <div class="panel">
+    <h2>L'entonnoir — du parc aux cibles prioritaires</h2>
+    <p class="ptag">À chaque étape on resserre : parc total → officines avec e-mail → e-mail grand public → sans messagerie MSSanté. La dernière barre est la cible actionnable.</p>
+    <div class="step">
+      <div class="name"><b>Officines (pharmacies d'officine)</b><span>répertoire FINESS type 620</span></div>
+      <div class="barwrap"><div class="bar" style="width:100.0%;background:#000091"></div></div>
+      <div class="pctbig"><b style="color:#000091">20 439</b><span>100 % du parc</span></div>
+    </div>
+<div class="step">
+      <div class="name"><b>Avec e-mail déclaré</b><span>71 % du parc — donnée publique</span></div>
+      <div class="barwrap"><div class="bar" style="width:71.4%;background:#5b8def"></div></div>
+      <div class="pctbig"><b style="color:#5b8def">14 596</b><span>71 % du parc</span></div>
+    </div>
+<div class="step">
+      <div class="name"><b>E-mail « grand public »</b><span>webmail / FAI (gmail, orange…)</span></div>
+      <div class="barwrap"><div class="bar" style="width:36.1%;background:#b34000"></div></div>
+      <div class="pctbig"><b style="color:#b34000">7 382</b><span>36 % du parc</span></div>
+    </div>
+<div class="step">
+      <div class="name"><b>Sans messagerie MSSanté → CIBLE</b><span>grand public ET aucune BAL MSSanté</span></div>
+      <div class="barwrap"><div class="bar" style="width:13.3%;background:#e1000f"></div></div>
+      <div class="pctbig"><b style="color:#e1000f">2 719</b><span>13 % du parc</span></div>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="panel">
+      <h2>Top domaines grand public</h2>
+      <p class="ptag">Domaines des e-mails de contact déclarés par les officines.</p>
+      <svg viewBox="0 0 780 405" preserveAspectRatio="xMinYMin meet" role="img"><text class="hb-lab" x="159" y="25.8">gmail.com</text><rect x="168" y="9" width="548.0" height="24" rx="4" fill="#000091"/><text class="hb-val" x="723.0" y="25.8">3 792</text><text class="hb-lab" x="159" y="58.8">orange.fr</text><rect x="168" y="42" width="229.6" height="24" rx="4" fill="#000091"/><text class="hb-val" x="404.6" y="58.8">1 589</text><text class="hb-lab" x="159" y="91.8">wanadoo.fr</text><rect x="168" y="75" width="84.3" height="24" rx="4" fill="#000091"/><text class="hb-val" x="259.3" y="91.8">583</text><text class="hb-lab" x="159" y="124.8">hotmail.fr</text><rect x="168" y="108" width="57.1" height="24" rx="4" fill="#000091"/><text class="hb-val" x="232.1" y="124.8">395</text><text class="hb-lab" x="159" y="157.8">yahoo.fr</text><rect x="168" y="141" width="46.2" height="24" rx="4" fill="#000091"/><text class="hb-val" x="221.2" y="157.8">320</text><text class="hb-lab" x="159" y="190.8">hotmail.com</text><rect x="168" y="174" width="28.5" height="24" rx="4" fill="#000091"/><text class="hb-val" x="203.5" y="190.8">197</text><text class="hb-lab" x="159" y="223.8">free.fr</text><rect x="168" y="207" width="15.3" height="24" rx="4" fill="#000091"/><text class="hb-val" x="190.3" y="223.8">106</text><text class="hb-lab" x="159" y="256.8">outlook.fr</text><rect x="168" y="240" width="12.7" height="24" rx="4" fill="#000091"/><text class="hb-val" x="187.7" y="256.8">88</text><text class="hb-lab" x="159" y="289.8">laposte.net</text><rect x="168" y="273" width="10.1" height="24" rx="4" fill="#000091"/><text class="hb-val" x="185.1" y="289.8">70</text><text class="hb-lab" x="159" y="322.8">live.fr</text><rect x="168" y="306" width="7.7" height="24" rx="4" fill="#000091"/><text class="hb-val" x="182.7" y="322.8">53</text><text class="hb-lab" x="159" y="355.8">yahoo.com</text><rect x="168" y="339" width="7.4" height="24" rx="4" fill="#000091"/><text class="hb-val" x="182.4" y="355.8">51</text><text class="hb-lab" x="159" y="388.8">sfr.fr</text><rect x="168" y="372" width="4.8" height="24" rx="4" fill="#000091"/><text class="hb-val" x="179.8" y="388.8">33</text></svg>
+    </div>
+    <div class="panel">
+      <h2>Ces officines ont-elles déjà une BAL MSSanté&nbsp;?</h2>
+      <p class="ptag">Parmi les 7 382 e-mails grand public, part déjà équipée en MSSanté vs. cibles réelles.</p>
+      <div class="split">
+        <div class="a" style="flex:37"><b>Sans MSSanté · 37&nbsp;%</b>2 721 — cibles</div>
+        <div class="b" style="flex:63"><b>Déjà MSSanté · 63&nbsp;%</b>4 674</div>
+      </div>
+      <div class="splitlab"><span>↑ à convertir en priorité</span><span>équipées ↑</span></div>
+      <p class="ptag" style="margin-top:16px">L'équipement MSSanté est établi hors API, par croisement avec l'extraction quotidienne des BAL MSSanté (data.gouv.fr) et la présence d'une adresse <code>@*.mssante.fr</code> dans les coordonnées de l'officine.</p>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>Cibles prioritaires par département (top 20)</h2>
+    <p class="ptag">Nombre d'officines à e-mail grand public sans messagerie MSSanté, par département — sur 101 départements couverts. De quoi prioriser géographiquement une campagne.</p>
+    <svg viewBox="0 0 780 608" preserveAspectRatio="xMinYMin meet" role="img"><text class="hb-lab" x="201" y="23.4">Bouches-du-Rhône (13)</text><rect x="210" y="8" width="506.0" height="22" rx="4" fill="#e1000f"/><text class="hb-val" x="723.0" y="23.4">350</text><text class="hb-lab" x="201" y="53.4">Seine-Maritime (76)</text><rect x="210" y="38" width="224.1" height="22" rx="4" fill="#e1000f"/><text class="hb-val" x="441.1" y="53.4">155</text><text class="hb-lab" x="201" y="83.4">Gironde (33)</text><rect x="210" y="68" width="164.8" height="22" rx="4" fill="#e1000f"/><text class="hb-val" x="381.8" y="83.4">114</text><text class="hb-lab" x="201" y="113.4">Loire-Atlantique (44)</text><rect x="210" y="98" width="135.9" height="22" rx="4" fill="#e1000f"/><text class="hb-val" x="352.9" y="113.4">94</text><text class="hb-lab" x="201" y="143.4">Alpes-Maritimes (06)</text><rect x="210" y="128" width="127.2" height="22" rx="4" fill="#e1000f"/><text class="hb-val" x="344.2" y="143.4">88</text><text class="hb-lab" x="201" y="173.4">Hérault (34)</text><rect x="210" y="158" width="117.1" height="22" rx="4" fill="#e1000f"/><text class="hb-val" x="334.1" y="173.4">81</text><text class="hb-lab" x="201" y="203.4">Calvados (14)</text><rect x="210" y="188" width="104.1" height="22" rx="4" fill="#e1000f"/><text class="hb-val" x="321.1" y="203.4">72</text><text class="hb-lab" x="201" y="233.4">Nord (59)</text><rect x="210" y="218" width="98.3" height="22" rx="4" fill="#e1000f"/><text class="hb-val" x="315.3" y="233.4">68</text><text class="hb-lab" x="201" y="263.4">Ille-et-Vilaine (35)</text><rect x="210" y="248" width="96.9" height="22" rx="4" fill="#e1000f"/><text class="hb-val" x="313.9" y="263.4">67</text><text class="hb-lab" x="201" y="293.4">Eure (27)</text><rect x="210" y="278" width="88.2" height="22" rx="4" fill="#e1000f"/><text class="hb-val" x="305.2" y="293.4">61</text><text class="hb-lab" x="201" y="323.4">Paris (75)</text><rect x="210" y="308" width="81.0" height="22" rx="4" fill="#e1000f"/><text class="hb-val" x="298.0" y="323.4">56</text><text class="hb-lab" x="201" y="353.4">Var (83)</text><rect x="210" y="338" width="81.0" height="22" rx="4" fill="#e1000f"/><text class="hb-val" x="298.0" y="353.4">56</text><text class="hb-lab" x="201" y="383.4">Vaucluse (84)</text><rect x="210" y="368" width="76.6" height="22" rx="4" fill="#e1000f"/><text class="hb-val" x="293.6" y="383.4">53</text><text class="hb-lab" x="201" y="413.4">Bas-Rhin (67)</text><rect x="210" y="398" width="75.2" height="22" rx="4" fill="#e1000f"/><text class="hb-val" x="292.2" y="413.4">52</text><text class="hb-lab" x="201" y="443.4">Corse (20)</text><rect x="210" y="428" width="66.5" height="22" rx="4" fill="#e1000f"/><text class="hb-val" x="283.5" y="443.4">46</text><text class="hb-lab" x="201" y="473.4">Pas-de-Calais (62)</text><rect x="210" y="458" width="65.1" height="22" rx="4" fill="#e1000f"/><text class="hb-val" x="282.1" y="473.4">45</text><text class="hb-lab" x="201" y="503.4">Charente-Maritime (17)</text><rect x="210" y="488" width="65.1" height="22" rx="4" fill="#e1000f"/><text class="hb-val" x="282.1" y="503.4">45</text><text class="hb-lab" x="201" y="533.4">Maine-et-Loire (49)</text><rect x="210" y="518" width="63.6" height="22" rx="4" fill="#e1000f"/><text class="hb-val" x="280.6" y="533.4">44</text><text class="hb-lab" x="201" y="563.4">Morbihan (56)</text><rect x="210" y="548" width="63.6" height="22" rx="4" fill="#e1000f"/><text class="hb-val" x="280.6" y="563.4">44</text><text class="hb-lab" x="201" y="593.4">Indre-et-Loire (37)</text><rect x="210" y="578" width="57.8" height="22" rx="4" fill="#e1000f"/><text class="hb-val" x="274.8" y="593.4">40</text></svg>
+  </div>
+  <details class="method" open>
+    <summary>Méthode, périmètre &amp; RGPD</summary>
+    <div class="body">
+      <p><b>Périmètre.</b> Toutes les <code>Organization</code> de type 620 (pharmacie d'officine) de l'Annuaire Santé, énumérées via l'API FHIR de l'ANS (données publiques). L'e-mail capté est celui déclaré au niveau <i>structure</i> de l'officine.</p>
+      <p><b>Classification.</b> Le domaine après « @ » est classé <code>grand public</code> (webmail/FAI : gmail, orange, wanadoo, hotmail, yahoo, free…), <code>professionnel</code> (domaine propre) ou <code>MSSanté</code> (<code>@*.mssante.fr</code>, exclu des cibles).</p>
+      <p><b>Cible prioritaire</b> = e-mail grand public <b>ET</b> aucune BAL MSSanté active (ni au niveau officine, ni via l'adresse <code>@mssante.fr</code> déclarée).</p>
+      <p><b>Limite.</b> Le tier public ne couvre pas l'e-mail de correspondance des pharmacien·nes (donnée restreinte) : les 5 843 officines sans e-mail public relèvent d'une extraction restreinte (voie B) ou du lac BICOEUR.</p>
+      <p><b>RGPD.</b> Cette page ne contient que des <b>dénombrements agrégés</b> — aucune adresse, aucun nom, aucun FINESS individuel. Le fichier nominatif de campagne reste hors ligne. Traitement fondé sur une mission d'intérêt public (art. 6.1.e + 6.3), finalité unique = adoption de MSSanté.</p>
+    </div>
+  </details>
+</div>
+<footer>
+  Fichier autonome, agrégats uniquement. Code &amp; méthode :
+  <a href="https://github.com/chaibax/mss-officines-webmail">github.com/chaibax/mss-officines-webmail</a>.
+  Source : API FHIR Annuaire Santé (ANS), données publiques — extraction du 2026-07-20.
+</footer>
+</body>
+</html>

@@ -25,9 +25,10 @@ Sorties (dans --out, défaut ./out) :
 """
 import argparse
 import csv
+import json
 import os
 import sys
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import date
 
 import bal_index
@@ -42,6 +43,16 @@ CSV_COLUMNS = [
 ]
 SRC_PUBLIC = "organization_public"
 SRC_RESTREINT = "practitioner_restreint"
+
+
+def departement(code_postal):
+    """Code département depuis le code postal (2 chiffres ; 3 pour l'outre-mer)."""
+    cp = (code_postal or "").strip()
+    if len(cp) < 2 or not cp[:2].isdigit():
+        return "??"
+    if cp[:2] in ("97", "98"):
+        return cp[:3] if len(cp) >= 3 else cp[:2]
+    return cp[:2]
 
 
 # ------------------------------------------------------------- parsing FHIR
@@ -223,6 +234,9 @@ def run(args):
                       config.CAT_MSSANTE: set()}
     top_domaines = Counter()
     cibles_finess = set()            # officines grand_public sans BAL MSS
+    par_dept = defaultdict(lambda: {"officines": 0, "avec_email": 0, "grand_public": 0})
+    cibles_by_dept = defaultdict(set)
+    a_bal_counts = Counter()         # répartition oui/non/inconnu (lignes grand public)
 
     # a_bal_mss = « oui » si BAL MSSanté avérée (extraction locale OU adresse
     # @*.mssante.fr présente dans les telecom), « non » si l'extraction est
@@ -244,9 +258,12 @@ def run(args):
         finess = pick_finess(org)
         name = org.get("name", "")
         line, cp, ville = pick_address(org)
+        dept = departement(cp)
         org_emails = classified_emails(org)
+        par_dept[dept]["officines"] += 1
         if org_emails:
             n_officines_email_public += 1
+            par_dept[dept]["avec_email"] += 1
         has_mssante_email = any(c == config.CAT_MSSANTE for _, _, c in org_emails)
         off_status = officine_status(finess, has_mssante_email)
 
@@ -260,6 +277,8 @@ def run(args):
                 continue
             seen.add(key)
             top_domaines[domain] += 1
+            par_dept[dept]["grand_public"] += 1
+            a_bal_counts[off_status] += 1
             rows.append({
                 "finess": finess, "raison_sociale": name, "adresse": line,
                 "code_postal": cp, "ville": ville, "rpps": "", "nom": "", "prenom": "",
@@ -268,6 +287,7 @@ def run(args):
             })
             if off_status == "non":
                 cibles_finess.add(finess)
+                cibles_by_dept[dept].add(finess)
 
         # Voie B — e-mail de correspondance des pharmaciens (donnée restreinte).
         if args.restreint and finess:
@@ -292,6 +312,8 @@ def run(args):
                         continue
                     seen.add(key)
                     top_domaines[domain] += 1
+                    par_dept[dept]["grand_public"] += 1
+                    a_bal_counts[p_status] += 1
                     rows.append({
                         "finess": finess, "raison_sociale": name, "adresse": line,
                         "code_postal": cp, "ville": ville, "rpps": rpps,
@@ -301,10 +323,17 @@ def run(args):
                     })
                     if p_status == "non":
                         cibles_finess.add(finess)
+                        cibles_by_dept[dept].add(finess)
 
         if n_officines % 1000 == 0:
             print(f"  [progress] {n_officines} officines, {len(rows)} lignes "
                   f"grand public", file=sys.stderr)
+
+    par_departement = sorted(
+        ({"dept": d, "officines": v["officines"], "avec_email": v["avec_email"],
+          "grand_public": v["grand_public"], "cibles": len(cibles_by_dept[d])}
+         for d, v in par_dept.items()),
+        key=lambda r: -r["cibles"])
 
     write_outputs(args.out, rows, {
         "n_officines": n_officines,
@@ -312,6 +341,8 @@ def run(args):
         "emails_par_cat": {k: len(v) for k, v in emails_par_cat.items()},
         "top_domaines": top_domaines,
         "n_cibles": len(cibles_finess),
+        "a_bal": dict(a_bal_counts),
+        "par_departement": par_departement,
         "bal_available": bal.available,
         "restreint": args.restreint,
     })
@@ -331,7 +362,31 @@ def write_outputs(out_dir, rows, stats):
     with open(md_path, "w", encoding="utf-8") as f:
         f.write(build_synthese(rows, stats))
 
-    print(f"\nÉcrit : {csv_path} ({len(rows)} lignes) ; {md_path}")
+    # Agrégats SANS donnée personnelle (uniquement des dénombrements) — sûrs à
+    # publier et consommés par le dashboard.
+    json_path = os.path.join(out_dir, "agregats.json")
+    agg = {
+        "date": date.today().isoformat(),
+        "source": "API FHIR Annuaire Santé (ANS) — données publiques",
+        "voie_b": stats["restreint"],
+        "parc": {
+            "officines": stats["n_officines"],
+            "avec_email": stats["n_officines_email_public"],
+            "sans_email": stats["n_officines"] - stats["n_officines_email_public"],
+            "emails_grand_public": stats["emails_par_cat"][config.CAT_GRAND_PUBLIC],
+            "emails_professionnel": stats["emails_par_cat"][config.CAT_PRO],
+            "emails_mssante": stats["emails_par_cat"][config.CAT_MSSANTE],
+            "lignes_grand_public": len(rows),
+            "cibles_prioritaires": stats["n_cibles"],
+        },
+        "a_bal": stats["a_bal"],
+        "top_domaines": stats["top_domaines"].most_common(20),
+        "par_departement": stats["par_departement"],
+    }
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(agg, f, ensure_ascii=False, indent=2)
+
+    print(f"\nÉcrit : {csv_path} ({len(rows)} lignes) ; {md_path} ; {json_path}")
 
 
 def build_synthese(rows, stats):
