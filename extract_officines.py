@@ -224,8 +224,20 @@ def run(args):
     top_domaines = Counter()
     cibles_finess = set()            # officines grand_public sans BAL MSS
 
-    def a_bal_value(has):
-        return "inconnu" if not bal.available else ("oui" if has else "non")
+    # a_bal_mss = « oui » si BAL MSSanté avérée (extraction locale OU adresse
+    # @*.mssante.fr présente dans les telecom), « non » si l'extraction est
+    # disponible et ne matche pas, « inconnu » si aucune source d'équipement.
+    def officine_status(finess, has_mss_email):
+        has = bal.officine_has_bal(finess) if bal.available else False
+        if has_mss_email or has:
+            return "oui"
+        return "non" if bal.available else "inconnu"
+
+    def pharm_status(rpps, off_status, has_mss_email):
+        has = bal.pharmacien_has_bal(rpps) if bal.available else False
+        if has_mss_email or has or off_status == "oui":
+            return "oui"
+        return "non" if bal.available else "inconnu"
 
     for org in enumerate_officines(client, limit=args.limit):
         n_officines += 1
@@ -235,7 +247,8 @@ def run(args):
         org_emails = classified_emails(org)
         if org_emails:
             n_officines_email_public += 1
-        officine_bal = bal.officine_has_bal(finess)
+        has_mssante_email = any(c == config.CAT_MSSANTE for _, _, c in org_emails)
+        off_status = officine_status(finess, has_mssante_email)
 
         # Voie A — e-mails déclarés au niveau structure.
         for email, domain, cat in org_emails:
@@ -251,9 +264,9 @@ def run(args):
                 "finess": finess, "raison_sociale": name, "adresse": line,
                 "code_postal": cp, "ville": ville, "rpps": "", "nom": "", "prenom": "",
                 "email": email, "domaine": domain, "categorie_domaine": cat,
-                "a_bal_mss": a_bal_value(officine_bal), "source": SRC_PUBLIC,
+                "a_bal_mss": off_status, "source": SRC_PUBLIC,
             })
-            if bal.available and not officine_bal:
+            if off_status == "non":
                 cibles_finess.add(finess)
 
         # Voie B — e-mail de correspondance des pharmaciens (donnée restreinte).
@@ -266,8 +279,11 @@ def run(args):
                     continue
                 rpps = pick_rpps(pract)
                 nom, prenom = practitioner_name(pract)
-                pharm_bal = bal.pharmacien_has_bal(rpps) or officine_bal
-                for email, domain, cat in classified_emails(pract):
+                pharm_emails = classified_emails(pract)
+                pharm_mss = has_mssante_email or any(
+                    c == config.CAT_MSSANTE for _, _, c in pharm_emails)
+                p_status = pharm_status(rpps, off_status, pharm_mss)
+                for email, domain, cat in pharm_emails:
                     emails_par_cat[cat].add(email)
                     if cat != config.CAT_GRAND_PUBLIC:
                         continue
@@ -281,9 +297,9 @@ def run(args):
                         "code_postal": cp, "ville": ville, "rpps": rpps,
                         "nom": nom, "prenom": prenom, "email": email,
                         "domaine": domain, "categorie_domaine": cat,
-                        "a_bal_mss": a_bal_value(pharm_bal), "source": SRC_RESTREINT,
+                        "a_bal_mss": p_status, "source": SRC_RESTREINT,
                     })
-                    if bal.available and not pharm_bal:
+                    if p_status == "non":
                         cibles_finess.add(finess)
 
         if n_officines % 1000 == 0:

@@ -17,9 +17,9 @@ BASE_URL = os.environ.get(
 # La clé n'est JAMAIS codée en dur : elle vient de la variable d'environnement.
 API_KEY_ENV = "ANS_API_KEY"
 
-# En-tête portant la clé. La passerelle Gravitee (API v2, refonte avril 2025)
-# attend « GRAVITEE-API-KEY ». Surchargeable si l'ANS fait évoluer l'en-tête.
-API_KEY_HEADER = os.environ.get("ANS_API_KEY_HEADER", "GRAVITEE-API-KEY")
+# En-tête portant la clé. Confirmé en direct sur la passerelle : « ESANTE-API-KEY »
+# (le paramètre de requête ?api-key= fonctionne aussi). Surchargeable si besoin.
+API_KEY_HEADER = os.environ.get("ANS_API_KEY_HEADER", "ESANTE-API-KEY")
 
 # Portail d'obtention de la clé (données publiques, self-service).
 PORTAIL_URL = "https://portail.openfhir.annuaire.sante.fr/"

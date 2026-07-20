@@ -8,6 +8,7 @@ pour tourner tel quel sur un poste. La clé n'est jamais journalisée.
 """
 import json
 import os
+import ssl
 import sys
 import time
 import urllib.error
@@ -15,6 +16,39 @@ import urllib.parse
 import urllib.request
 
 import config
+
+# Bundles CA connus (repli macOS/Homebrew quand le build Python ne trouve pas
+# de magasin de confiance — cas classique du build python.org sans « Install
+# Certificates.command »).
+_CA_CANDIDATES = (
+    "/etc/ssl/cert.pem",
+    "/opt/homebrew/etc/ca-certificates/cert.pem",
+    "/opt/homebrew/etc/openssl@3/cert.pem",
+    "/usr/local/etc/openssl@3/cert.pem",
+)
+
+
+def build_ssl_context():
+    """Contexte TLS avec vérification, en trouvant un magasin CA qui existe.
+
+    Ordre : SSL_CERT_FILE explicite -> certifi -> magasin système valide ->
+    bundles connus. Ne désactive jamais la vérification des certificats.
+    """
+    env = os.environ.get("SSL_CERT_FILE")
+    if env and os.path.exists(env):
+        return ssl.create_default_context(cafile=env)
+    try:
+        import certifi  # optionnel
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        pass
+    paths = ssl.get_default_verify_paths()
+    if (paths.cafile and os.path.exists(paths.cafile)) or (paths.capath and os.path.isdir(paths.capath)):
+        return ssl.create_default_context()
+    for f in _CA_CANDIDATES:
+        if os.path.exists(f):
+            return ssl.create_default_context(cafile=f)
+    return ssl.create_default_context()
 
 
 class AnnuaireError(RuntimeError):
@@ -27,6 +61,7 @@ class AnnuaireClient:
         self.api_key = api_key or os.environ.get(config.API_KEY_ENV)
         self.verbose = verbose
         self.timeout = timeout
+        self._ssl = build_ssl_context()
         if not self.api_key:
             raise AnnuaireError(
                 f"Clé API absente. Exporter {config.API_KEY_ENV} avant de lancer "
@@ -42,7 +77,7 @@ class AnnuaireClient:
         for attempt in range(max_retries + 1):
             req = urllib.request.Request(url, headers=self._headers())
             try:
-                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                with urllib.request.urlopen(req, timeout=self.timeout, context=self._ssl) as resp:
                     return json.loads(resp.read().decode("utf-8"))
             except urllib.error.HTTPError as e:
                 if e.code == 429:
