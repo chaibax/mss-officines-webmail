@@ -1,0 +1,2 @@
+# Aucune dépendance externe : bibliothèque standard Python 3.9+ uniquement
+# (urllib, csv, json, argparse). Rien à installer.

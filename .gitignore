@@ -1,0 +1,19 @@
+# --- Sorties contenant des données à caractère personnel : NE JAMAIS versionner ---
+out/
+*.csv
+synthese.md
+
+# --- Extraction MSSanté locale (volumineuse, données personnelles) ---
+extraction-correspondance-mssante*.txt
+
+# --- Secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
