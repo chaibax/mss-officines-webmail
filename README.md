@@ -74,10 +74,18 @@ extraction, `a_bal_mss = "inconnu"`.
 
 - **`officines_email_grand_public.csv`** (séparateur `;`, UTF-8) — colonnes :
   `finess;raison_sociale;adresse;code_postal;ville;rpps;nom;prenom;email;domaine;categorie_domaine;a_bal_mss;source`
-  avec `source ∈ {organization_public, practitioner_restreint}`.
-- **`synthese.md`** — parc total, taux de couverture e-mail, répartition par
-  catégorie de domaine, top domaines grand public, **cibles prioritaires**
-  (grand public **sans** BAL MSSanté), et l'écart d'habilitation restant.
+  avec `source ∈ {organization_public, practitioner_restreint}`. La colonne
+  `a_bal_mss` distingue les **deux cibles** : `non` = à équiper (sans MSSanté),
+  `oui` = à accompagner (déjà équipée, joignable sur sa boîte grand public).
+- **`officines_email_professionnel.csv`** — mêmes colonnes, pour les e-mails à
+  **domaine propre** (« non public » : ni webmail, ni MSSanté). Contactables hors
+  espace de confiance MSSanté.
+- **`synthese.md`** — parc, couverture e-mail, répartition par catégorie, top
+  domaines (grand public **et** professionnels), les deux cibles, écart d'habilitation.
+- **`agregats.json`** — dénombrements uniquement (aucune donnée nominative), source
+  du dashboard.
+
+Les CSV contiennent des données personnelles → **jamais versionnés** (`.gitignore`).
 
 ## 5. Architecture
 
