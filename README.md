@@ -95,8 +95,27 @@ Les CSV contiennent des données personnelles → **jamais versionnés** (`.giti
 | `classify.py` | Normalisation e-mail + classification `grand_public` / `professionnel` / `mssante` (logique pure, testée). |
 | `ans_client.py` | Client FHIR : auth par en-tête, backoff 429, pagination `next`. Aucune dépendance. |
 | `bal_index.py` | Index des BAL MSSanté depuis l'extraction locale (enrichissement `a_bal_mss`). |
-| `extract_officines.py` | Orchestration : voie A → voie B → enrichissement → CSV + synthèse. CLI. |
+| `extract_officines.py` | Orchestration : voie A → voie B → enrichissement → CSV + synthèse + `agregats.json`. CLI. |
+| `build_dashboard.py` | Génère le tableau de bord DSFR (`dashboard/index.html`) depuis `agregats.json`. `--local` = liens CSV actifs. |
+| `france_map.py` | Carte choroplèthe de France (SVG) depuis `assets/departements-simplifie.geojson`. |
+| `email_logos.py` | Logos + libellés des fournisseurs d'e-mail grand public. |
+| `fetch-dsfr.sh` | Installe le DSFR auto-hébergé dans `dashboard/dsfr/` (vendored, hors git). |
 | `test_classify.py` | Tests unitaires (offline). |
+
+## 5 bis. Tableau de bord DSFR
+
+« Tableau de bord — Pilotage MSS en officine » — page autonome au **Système de
+Design de l'État (DSFR)** : carte de France, top domaines avec logos, deux cibles,
+cibles par département, date de MAJ, exports CSV.
+
+```bash
+./fetch-dsfr.sh                       # une fois : installe DSFR dans dashboard/dsfr/
+python3 build_dashboard.py            # version publique (exports CSV verrouillés — RGPD)
+python3 build_dashboard.py --local    # version interne (liens CSV actifs, pour démo locale)
+```
+
+⚠️ **Ne jamais déployer les CSV publiquement.** Le déploiement public exclut
+`dashboard/data/` : `rsync -a --exclude data dashboard/ /tmp/pub/ && netlify deploy --prod --dir=/tmp/pub`.
 
 ## 6. Robustesse & conformité
 
