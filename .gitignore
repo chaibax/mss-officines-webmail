@@ -23,3 +23,9 @@ venv/
 
 # Local Netlify folder
 .netlify
+
+# CSV nominatifs copiés pour la démo locale (jamais publiés)
+dashboard/data/
+
+# DSFR vendored (récupéré via ./fetch-dsfr.sh)
+dashboard/dsfr/
