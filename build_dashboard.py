@@ -158,14 +158,27 @@ def build(agg, local=False):
     dpairs = [(f'{DEPT_NOMS.get(r["dept"], r["dept"])} ({r["dept"]})', r["cibles"]) for r in depts]
     dept_svg = hbar_svg(dpairs, color=ROUGE, width=880, bar_h=22, gap=8, label_w=210)
 
-    # Carte : densité d'e-mails grand public par département.
-    vals = {r["dept"]: r["grand_public"] for r in agg["par_departement"]}
-    carte_svg, legend = france_map.build_map(GEOJSON, vals, width=560)
+    # Carte : TAUX d'officines à e-mail grand public, rapporté au parc du département.
+    carte_data = {}
+    for r in agg["par_departement"]:
+        tot = r.get("officines") or 0
+        if tot <= 0:
+            continue
+        carte_data[r["dept"]] = {
+            "pct": 100 * r["grand_public"] / tot, "gp": r["grand_public"],
+            "tot": tot, "cov": 100 * r["avec_email"] / tot,
+        }
+    carte_svg, legend = france_map.build_map(GEOJSON, carte_data, width=540)
     legend_html = "".join(
         f'<span class="leg"><i style="background:{c}"></i>{esc(l)}</span>' for c, l in legend)
-    top3 = agg["par_departement"][:3]
+    # Taux les plus élevés — parc >= 50 officines pour éviter le bruit des petits départements.
+    tops = sorted((r for r in agg["par_departement"] if (r.get("officines") or 0) >= 50),
+                  key=lambda r: -(r["grand_public"] / r["officines"]))[:3]
     top3_html = " · ".join(
-        f'<b>{esc(DEPT_NOMS.get(r["dept"], r["dept"]))}</b> {nf(r["grand_public"])}' for r in top3)
+        f'<b>{esc(DEPT_NOMS.get(r["dept"], r["dept"]))}</b> '
+        f'{france_map.pct_fr(100 * r["grand_public"] / r["officines"])}' for r in tops)
+    taux_national = france_map.pct_fr(
+        100 * p["lignes_grand_public"] / p["officines"] if p["officines"] else 0)
 
     non, oui = a_equiper, a_accompagner
     tot = oui + non or 1
@@ -180,7 +193,7 @@ def build(agg, local=False):
         cibles=nf(a_equiper), accomp=nf(a_accompagner),
         kpi_pct_cible=f"{100 * a_equiper / p['officines']:.0f}" if p["officines"] else "0",
         funnel=funnel_html(steps), dom_rows=dom_rows, dompro_svg=dompro_svg, dept_svg=dept_svg,
-        carte=carte_svg, legende=legend_html, top3=top3_html,
+        carte=carte_svg, legende=legend_html, top3=top3_html, taux_national=taux_national,
         non=nf(non), oui=nf(oui), pna=f"{pna:.0f}", poa=f"{poa:.0f}",
         n_depts=len(agg["par_departement"]),
         downloads=downloads_html(local, nf(p["lignes_grand_public"]), nf(p["lignes_professionnel"])),
@@ -275,17 +288,19 @@ TEMPLATE = """<!DOCTYPE html>
   </div>
 
   <div class="card fr-mb-3w">
-    <h2>Répartition géographique — officines à e-mail grand public</h2>
-    <p class="tag">Densité par département. Plus le bleu est foncé, plus il y a d'officines joignables en webmail grand public.</p>
+    <h2>Répartition géographique — taux d'e-mails grand public</h2>
+    <p class="tag">Part du parc de chaque département joignable via un webmail grand public (officines à e-mail grand public ÷ officines du département). Plus le bleu est foncé, plus la part est élevée.</p>
     <div class="carte-wrap">
       {carte}
       <div class="carte-side">
-        <p class="fr-text--sm fr-mb-1w"><b>Nombre d'officines à e-mail grand public</b></p>
+        <p class="fr-text--sm fr-mb-1w"><b>Part d'officines à e-mail grand public</b></p>
         {legende}
+        <p class="fr-text--sm fr-mt-2w" style="color:var(--text-mention-grey)">Moyenne nationale&nbsp;: <b>{taux_national}</b></p>
         <hr class="fr-mt-2w fr-mb-2w">
-        <p class="fr-text--sm" style="color:var(--text-mention-grey)">Top départements&nbsp;: {top3}</p>
+        <p class="fr-text--sm" style="color:var(--text-mention-grey)">Taux les plus élevés&nbsp;: {top3}</p>
       </div>
     </div>
+    <p class="fr-text--sm fr-mt-2w" style="color:var(--text-mention-grey)"><b>Lecture&nbsp;:</b> un taux faible peut aussi traduire une faible déclaration d'e-mail dans l'Annuaire plutôt qu'une meilleure maturité (ex.&nbsp;: Paris, 22&nbsp;% du parc déclare un e-mail). Survolez un département pour le détail.</p>
   </div>
 
   <div class="card fr-mb-3w">
